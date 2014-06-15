@@ -1,6 +1,6 @@
 # Aws::Cfn::Stacker
 
-TODO: Write a gem description
+A CloudFormation stack management helper to do stack CRUD and chaining
 
 ## Installation
 

@@ -7,9 +7,9 @@ Gem::Specification.new do |spec|
   spec.name          = "aws-cfn-stacker"
   spec.version       = Aws::Cfn::Stacker::VERSION
   spec.authors       = ["Christo De Lange"]
-  spec.email         = ["cdelange@amplify.com"]
-  spec.summary       = %q{TODO: Write a short summary. Required.}
-  spec.description   = %q{TODO: Write a longer description. Optional.}
+  spec.email         = ["rubygems@dldinternet.com"]
+  spec.summary       = %q{A CloudFormation stack management helper to do stack CRUD and chaining}
+  spec.description   = %q{A CloudFormation stack management helper to do stack CRUD and chaining. It eases the pain of setting up parameters and chaining stacks.}
   spec.homepage      = ""
   spec.license       = "MIT"
 
@@ -17,6 +17,8 @@ Gem::Specification.new do |spec|
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
+
+  spec.add_dependency 'aws-cfn-yats', ">= 0.1.6", '~> 0.1'
 
   spec.add_development_dependency "bundler", "~> 1.6"
   spec.add_development_dependency "rake"
