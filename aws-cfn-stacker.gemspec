@@ -18,6 +18,11 @@ Gem::Specification.new do |spec|
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
 
+  spec.add_dependency 'awesome_print'
+  spec.add_dependency 'colorize'
+  spec.add_dependency 'inifile'
+  spec.add_dependency 'dldinternet-mixlib-cli', ">= 0.1.0", '~> 0.1'
+  spec.add_dependency 'dldinternet-mixlib-logging', ">= 0.1.5", '~> 0.1'
   spec.add_dependency 'aws-cfn-yats', ">= 0.1.6", '~> 0.1'
 
   spec.add_development_dependency "bundler", "~> 1.6"

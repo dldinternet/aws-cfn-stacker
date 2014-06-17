@@ -1,7 +1,12 @@
 module Aws
   module Cfn
     module Stacker
-      VERSION = "0.0.1"
+
+        MAJOR   = 0
+        MINOR   = 0
+        PATCH   = 5
+        VERSION = "#{MAJOR}.#{MINOR}.#{PATCH}"
+
     end
   end
 end
