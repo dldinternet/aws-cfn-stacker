@@ -1,7 +1,3 @@
-require 'colorize'
-require 'inifile'
-require 'awesome_print'
-
 module Aws
   module Cfn
     module Stacker
@@ -9,18 +5,26 @@ module Aws
       module Main
 
         # --------------------------------------------------------------------------------------------------------------
-        MY_NAME = "cfn-stacker"
-        NO_COMMAND_GIVEN = "You need to pass a sub-command (e.g., #{MY_NAME} SUB-COMMAND or #{MY_NAME} -a|--action SUB-COMMAND)\n"
+        @MY_NAME = "cfn-stacker"
+        @NO_COMMAND_GIVEN = "You need to pass a sub-command (e.g., #{@MY_NAME} SUB-COMMAND or #{@MY_NAME} -a|--action SUB-COMMAND)\n"
 
         # --------------------------------------------------------------------------------------------------------------
         attr_accessor :logger
-        attr_accessor :verbosity
+        attr_accessor :actors
         attr_accessor :LOGLEVELS
         attr_accessor :ALLACTIONS
         # --------------------------------------------------------------------------------------------------------------
 
         # --------------------------------------------------------------------------------------------------------------
         module ClassMethods
+
+          def actors
+            @ACTORS
+          end
+
+          def actors=(v)
+          @ACTORS  = v
+          end
 
           def loglevels
             @LOGLEVELS
@@ -38,32 +42,39 @@ module Aws
             @ALLACTIONS = acts || [ :build, :configure, :create, :status, :update, :delete, :outputs, :watch, :listparams ]
           end
 
-
         end
 
         # --------------------------------------------------------------------------------------------------------------
         def self.included(includer)
           includer.extend(ClassMethods)
           includer.class_eval do
+            requires do
+              require 'colorize'
+              require 'inifile'
+              require 'awesome_print'
+            end
+
+            self.actors     = {}
             self.loglevels  = [:trace, :debug, :step, :info, :warn, :error, :fatal, :todo]
-            self.allactions = [ :build, :configure, :create, :status, :update, :delete, :outputs, :watch, :listparams ]
+            self.allactions = [ :build, :configure, :create, :status, :update, :delete, :outputs, :watch, :list_params, :list_stacks ]
           end
         end
 
         # --------------------------------------------------------------------------------
         # Create a new instance of the current class configured for the given
         # arguments and options
-        def initialize
+        def initialize()
           $STKR           = self
           @TODO           = {}
           @defaultOptions = {}
-
+          @inis           = []
           super
         end
 
         # -----------------------------------------------------------------------------
         def run(argv)
           begin
+            StackerApplication.load_commands
             @argv           = argv
             prescreen_options()
             quiet_traps()
@@ -74,7 +85,7 @@ module Aws
             exit 0
           rescue StackerError => e
             puts e.message.light_red
-            puts "#{__FILE__}::#{__LINE__} reraising ... "
+            puts "#{__FILE__}:#{__LINE__} reraising ... "
             raise e
             exit -1
           end
@@ -133,7 +144,7 @@ module Aws
           defaults={
               disable_rollback: true,
               template_dir:   File.join(cwd, 'templates'),
-              stack_dir:      File.join(File.dirname(@options[:config_file]), 'stacks'),
+              stack_dir:      File.join(File.dirname(@config[:config_file]), 'stacks'),
               playbooks_dir:  File.join(cwd, 'ansible', 'playbooks')
           }
           #config = ConfigParser.ConfigParser(
@@ -162,29 +173,17 @@ module Aws
         end
 
         def configure_logging
-          super
           @config[:log_opts] = lambda{|mlll| {
-              :pattern      => "%#{mlll}l: %m %C\n",
-              :date_pattern => '%Y-%m-%d %H:%M:%S',
-          }
-          }
+                                                :pattern      => "%#{mlll}l: %m %C\n",
+                                                :date_pattern => '%Y-%m-%d %H:%M:%S',
+                                              }
+                                      }
 
           @logger = getLogger(@config)
         end
 
         def configure_stdout_logger
         end
-
-        # Called prior to starting the application, by the run method
-        def setup_application
-          raise ApplicationError, "#{self.to_s}: you must override setup_application"
-        end
-
-        # Actually run the application
-        def run_application
-          raise ApplicationError, "#{self.to_s}: you must override run_application"
-        end
-
 
       end
     end

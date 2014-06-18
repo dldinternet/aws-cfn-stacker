@@ -1,8 +1,10 @@
+require 'awesome_print'
+require 'inifile'
+require 'colorize'
 
 module Aws
   module Cfn
     module Stacker
-
       module Options
         include ::DLDInternet::Mixlib::CLI
 
@@ -20,17 +22,29 @@ module Aws
 
           prescreen_options(argv)
 
-          @config = parse_and_validate_options(@config,source ? source : "ARGV - #{__LINE__}")
+          @config = parse_and_validate_options(@config,source ? source : "ARGV - #{File.basename __FILE__}::#{__LINE__}")
 
-          unless @config[:actions]
-            @config[:actions] = [ argv[1].to_sym ]
+          if argv.size > 0
+            argv.each { |arg|
+              action = parseOptionString(arg, ',', 'parseActionSymbol')
+              if action
+                @config[:actions] << action
+              end
+            }
           end
-          @actors[argv[1].to_sym] = self
-          others = @config[:actions].select{|a|
-            a != argv[1].to_sym
+          actions = Hash[@config[:actions].flatten.map{ |v| [v, 1] }]
+          @config[:actions] = actions.keys
+          @config[:actions].each {|action|
+            unless StackerApplication.actors[action]
+              subcommand_class = StackerApplication.subcommand_class_from([action.to_s])
+              subcommand_class.load_deps
+              instance = subcommand_class.new()
+              StackerApplication.actors[action] = instance
+              instance.configure_application
+            end
           }
-          index   = args.index '--action'
           argv
+
         end
 
         # --------------------------------------------------------------------------------------------------------------
@@ -41,12 +55,12 @@ module Aws
           # Checking ARGV validity *before* parse_options because parse_options
           # mangles ARGV in some situations
           if no_command_given?
-            print_help_and_exit(1, NO_COMMAND_GIVEN)
+            print_help_and_exit(1, @NO_COMMAND_GIVEN)
           elsif no_subcommand_given?
             if want_help? || want_version?
               print_help_and_exit
             else
-              print_help_and_exit(2, NO_COMMAND_GIVEN)
+              print_help_and_exit(2, @NO_COMMAND_GIVEN)
             end
           end
         end
@@ -81,16 +95,16 @@ module Aws
         # --------------------------------------------------------------------------------
         def parseActionSymbol(v)
           if v.to_sym == :all
-            ::Aws::Cfn::Stacker::Application.allactions
+            StackerApplication.allactions
           else
-            s = v.to_sym
-            allactions = [::Aws::Cfn::Stacker::Application.allactions, :all].flatten
+            s = v.gsub('-', '_').to_sym
+            allactions = [StackerApplication.allactions, :all].flatten
             unless allactions.include?(s)
               allactions.each{ |p|
                 s = p if p.match(%r/^#{s}/)
               }
             end
-            s = ::Aws::Cfn::Stacker::Application.allactions if s == :all
+            s = StackerApplication.allactions if s == :all
             s
           end
         end
@@ -128,10 +142,11 @@ module Aws
             raise StackerError.new("Recursive call to inifile == '#{options[:inifile]}'") if @inis.include?(options[:inifile])
             ini = nil
             begin
+              # puts "IniFile.load('#{options[:inifile]}')"
               ini = IniFile.load(options[:inifile])
               @inis << options[:inifile]
               ini['global'].each { |key, value|
-                #puts "#{key}=#{value}"
+                # puts "#{key}=#{value}"
                 ENV[key]=value
               }
               argv=[]
@@ -218,12 +233,12 @@ module Aws
               #findRootPath(options)
           rescue StackerError => e
             puts e.message.light_red
-            puts "#{__FILE__}::#{__LINE__} reraising ... "
+            puts "#{__FILE__}:#{__LINE__} reraising ... "
             raise e
             exit -1
           rescue Exception => e
             puts e.message.light_red
-            puts "#{__FILE__}::#{__LINE__} reraising ... "
+            puts "#{__FILE__}:#{__LINE__} reraising ... "
             raise e
             exit -2
           end
@@ -266,6 +281,9 @@ module Aws
         #
         # If this module is included we inject this payload into the including class.
         #
+        def self.extended(includer)
+          included includer
+        end
         def self.included(includer)
           includer.extend(::DLDInternet::Mixlib::CLI::ClassMethods)
           includer.extend(ClassMethods)
@@ -317,7 +335,7 @@ module Aws
                     short:        '-V',
                     long:         '--version',
                     description:  'Show version',
-                    proc:         Proc.new{ puts ::Aws::Cfn::Stacker::Application::VERSION },
+                    proc:         Proc.new{ puts ::Aws::Cfn::Stacker::VERSION },
                     exit:         2
             option  :config_file_alt,
                     short:        '-c',
@@ -329,40 +347,41 @@ module Aws
             option  :config_file,
                     short:        '-c',
                     long:         '--config_file FILE',
-                    description:  'A config file to use that contains one section per stack, with all the parameters for the stack enumerated. INI, YAML and JSON formats supported.'
+                    description:  'A config file to use that contains one section per stack, with all the parameters for the stack enumerated. INI, YAML and JSON formats supported.',
+                    default:      'config/config.ini'
             option  :verbose,
                     short:        '-v',
                     long:         '--verbose',
                     description:  'Increase verbosity, can be specified multiple times',
                     proc:         lambda {|v|
-                      index = ::Aws::Cfn::Stacker::Application.loglevels.index(@options[:log_level]) || ::Aws::Cfn::Stacker::Application.loglevels.index(:warn)
+                      index = $STKR.class.loglevels.index(@options[:log_level]) || $STKR.class.loglevels.index(:warn)
                       index -= 1 if index > 0
-                      @options[:log_level] = ::Aws::Cfn::Stacker::Application.loglevels[index]
+                      @options[:log_level] = $STKR.class..loglevels[index]
                     }
             option  :log_level,
                     long:         '--debug',
                     description:  'Set debug level logging. No effect if specified second time.',
-                    value:        :debug
-            option  :action,
+                    default:      :debug
+            option  :actions,
                     short:        '-a',
                     long:         '--action ACTION',
-                    description:  "Perform the requested action against the stack. (#{::Aws::Cfn::Stacker::Application.allactions.to_s})",
+                    description:  "Perform the requested action against the stack. (#{StackerApplication.allactions.to_s})",
                     proc:         lambda{|v|
                       actions = $STKR.parseOptionString(v,',', 'parseActionSymbol')
-                      all     = [::Aws::Cfn::Stacker::Application.allactions, :all].flatten
+                      all     = [StackerApplication.allactions, :all].flatten
                       actions.each{ |act|
                         unless all.include?(act.to_sym)
                           raise ::OptionParser::InvalidOption.new("Invalid action: #{act.to_s}. Valid actions are: #{all.to_s}")
                         end
                       }
                       actions
-                    }
+                    },
+                    default:      [ :create ]
             option  :build,
                     short:        '-b',
                     long:         '--build',
                     description:  'Build configuration directory for use with Ansible.',
                     proc:         lambda { |v| @options[:action] = :build}
-
             option  :remove,
                     short:        '-r',
                     long:         '--remove',
@@ -396,14 +415,15 @@ module Aws
             option  :template,
                     short:        '-t',
                     long:         '--template FILE',
-                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary. Default #{::Aws::Cfn::Stacker::Application.defaultoptions[:template_file]}",
+                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary. Default #{StackerApplication.defaultoptions[:template_file]}",
                     proc:         lambda { |v| @options[:template_file] = v }
             option  :template_file,
                     long:         '--template-file FILE',
-                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary. Default #{::Aws::Cfn::Stacker::Application.defaultoptions[:template_file]}"
+                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary. Default #{StackerApplication.defaultoptions[:template_file]}",
+                    default:      'templates/mvc-vpc.json'
             option  :template_file_alt,
                     long:         '--template_file FILE',
-                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary. Default #{::Aws::Cfn::Stacker::Application.defaultoptions[:template_file]}",
+                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary. Default #{StackerApplication.defaultoptions[:template_file]}",
                     proc:         lambda { |v| @options[:template_file] = v }
             option  :template_url_alt,
                     long:         '--template-url URL',
@@ -421,14 +441,17 @@ module Aws
                     description:  'The path to the SSH key file to use for SSH to hosts'
             option  :ssh_user,
                     long:         '--ssh_user USER',
-                    description:  'SSH User name'
+                    description:  'SSH User name',
+                    default:      'ubuntu'
             option  :ssh_user_bastion,
                     long:         '--ssh_user_bastion USER',
-                    description:  'Bastion SSH User name'
+                    description:  'Bastion SSH User name',
+                    default:      'ubuntu'
             option  :initial_setup,
                     short:        '-i',
                     long:         '--initial_setup FILE',
-                    description:  'An initial setup file for Ansible'
+                    description:  'An initial setup file for Ansible',
+                    default:      'ansible/playbooks/initial_setup.yml'
             option  :output_path,
                     short:        '-o',
                     long:         '--output PATH',
@@ -436,11 +459,17 @@ module Aws
             option  :roles_path,
                     short:        '-r',
                     long:         '--roles_path PATH',
-                    description:  'Output folder for the Ansible build configuration'
+                    description:  'Output folder for the Ansible build configuration',
+                    default:      'ansible/playbooks/roles'
             option  :progress,
                     short:        '-p',
                     long:         '--progress',
-                    description:  'Print a progress indicator during stack create/update/delete.'
+                    description:  'Print a progress indicator during stack create/update/delete.',
+                    default:      false
+            option  :inifile,
+                    short:        "-f",
+                    long:         "--inifile FILE",
+                    description:  "INI file with settings"
             option  :log_file_alt,
                     long:         '--log-file PATH',
                     description:  'Log destination file',
@@ -452,12 +481,12 @@ module Aws
                     long:         '--log-level LEVEL',
                     description:  'Logging level',
                     proc:         lambda{|v|
-                      if ::Aws::Cfn::Stacker::Application.loglevels.include? v.to_sym
+                      if StackerApplication.loglevels.include? v.to_sym
                         v.to_sym
                       else
-                        level = ::Aws::Cfn::Stacker::Application.loglevels.select{|l| l.to_s.match(%r(^#{v}))}
+                        level = StackerApplication.loglevels.select{|l| l.to_s.match(%r(^#{v}))}
                         unless level.size > 0
-                          raise ::OptionParser::InvalidOption.new("Invalid log level: #{v}. Valid levels are #{::Aws::Cfn::Stacker::Application.loglevels.ai}")
+                          raise ::OptionParser::InvalidOption.new("Invalid log level: #{v}. Valid levels are #{StackerApplication.loglevels.ai}")
                         end
                         level[0].to_sym
                       end
@@ -466,12 +495,12 @@ module Aws
                     long:         '--log_level LEVEL',
                     description:  'Logging level',
                     proc:         lambda{|v|
-                      if ::Aws::Cfn::Stacker::Application.loglevels.include? v.to_sym
+                      if StackerApplication.loglevels.include? v.to_sym
                         v.to_sym
                       else
-                        level = ::Aws::Cfn::Stacker::Application.loglevels.select{|l| l.to_s.match(%r(^#{v}))}
+                        level = StackerApplication.loglevels.select{|l| l.to_s.match(%r(^#{v}))}
                         unless level.size > 0
-                          raise ::OptionParser::InvalidOption.new("Invalid log level: #{v}. Valid levels are #{::Aws::Cfn::Stacker::Application.loglevels.ai}")
+                          raise ::OptionParser::InvalidOption.new("Invalid log level: #{v}. Valid levels are #{StackerApplication.loglevels.ai}")
                         end
                         level[0].to_sym
                       end

@@ -14,7 +14,8 @@ module Aws
   module Cfn
     module Stacker
       # noinspection RubyTooManyInstanceVariablesInspection,RubyTooManyMethodsInspection
-      class Application
+      class StackerApplication < StackerBase
+
         require 'dldinternet/mixlib/cli'
         include ::DLDInternet::Mixlib::CLI
 

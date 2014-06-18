@@ -22,4 +22,5 @@ add_path = File.expand_path(File.join(path, "..", "lib"))
 $:.unshift(add_path)
 
 require 'aws/cfn/stacker'
-Aws::Cfn::Stacker::Application.new.run(ARGV)
+Aws::Cfn::Stacker::StackerApplication.cmd = cmd
+Aws::Cfn::Stacker::StackerApplication.new.run(ARGV)

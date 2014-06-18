@@ -55,7 +55,7 @@ module Aws
           embedded_ruby = "#{embedded_bin}/ruby"
           if File.executable?(embedded_ruby)
             ruby_version = "\x1b[$38;5;1m"+%x(#{embedded_ruby} -v 2>/dev/null)+"\x1b[0m" # .gsub(%r/\s+/, '')
-            puts "You have a Chef embedded Ruby ... #{ruby_version} ...\n\nYou should place it on the PATH (export PATH=/opt/chef/embedded/bin:#{ENV['PATH']}) or use it directly."
+            puts "You have a Chef embedded Ruby ... #{ruby_version} ...\n\nYou should place it on the PATH (export PATH=#{embedded_bin}#{File::PATH_SEPARATOR}$PATH) or use it directly."
             return 0
           end
           1

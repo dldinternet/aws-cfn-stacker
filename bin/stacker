@@ -1,0 +1,3 @@
+#!/usr/bin/env ruby
+
+Kernel.load "#{File.join(File.dirname(__FILE__), 'cfn-stacker')}"
