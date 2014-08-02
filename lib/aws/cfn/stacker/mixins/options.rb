@@ -6,7 +6,9 @@ module Aws
   module Cfn
     module Stacker
       module Options
-        include ::DLDInternet::Mixlib::CLI
+
+        require 'dldinternet/mixlib/cli/mixins/parsers'
+        include ::DLDInternet::Mixlib::CLI::Parsers
 
         # --------------------------------------------------------------------------------
         #
