@@ -46,3 +46,4 @@ build/
 .rvmrc
 .idea
 *.iml
+out
