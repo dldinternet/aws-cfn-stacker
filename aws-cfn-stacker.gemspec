@@ -10,8 +10,8 @@ Gem::Specification.new do |spec|
   spec.email         = ["rubygems@dldinternet.com"]
   spec.summary       = %q{A CloudFormation stack management helper to do stack CRUD and chaining}
   spec.description   = %q{A CloudFormation stack management helper to do stack CRUD and chaining. It eases the pain of setting up parameters and chaining stacks.}
-  spec.homepage      = ""
-  spec.license       = "MIT"
+  spec.homepage      = ''
+  spec.license       = 'Apache2'
 
   spec.files         = `git ls-files -z`.split("\x0")
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
@@ -26,7 +26,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'aws-cfn-dsl',        '>= 0.9.3'
   spec.add_dependency 'aws-cfn-compiler',   '>= 0.9.4'
   spec.add_dependency 'aws-cfn-decompiler', '>= 0.9.1'
-  spec.add_dependency 'aws-cfn-yats',       '>= 0.1.9'
   spec.add_dependency 'dldinternet-mixlib-logging', '>= 0.4.0'
   spec.add_dependency 'mixlib-cli', '> 0'
   spec.add_dependency 'dldinternet-mixlib-cli', '>= 0.2.0'

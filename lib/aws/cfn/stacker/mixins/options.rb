@@ -287,7 +287,7 @@ module Aws
           included includer
         end
         def self.included(includer)
-          includer.extend(::DLDInternet::Mixlib::CLI::ClassMethods)
+          includer.extend(::DLDInternet::Mixlib::CLI::Parsers::ClassMethods)
           includer.extend(ClassMethods)
 
           includer.class_eval do

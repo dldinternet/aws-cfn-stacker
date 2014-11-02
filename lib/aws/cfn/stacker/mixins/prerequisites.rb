@@ -78,11 +78,11 @@ module Aws
             begin
               ENV.delete('GEM_PATH')
               ENV.delete('GEM_HOME')
-              require "chef/version"
+              require 'chef/version'
             rescue LoadError => e
-              puts "Your Ruby is new enough but you do not seem to have the Chef gem installed!"
+              puts 'Your Ruby is new enough but you do not seem to have the Chef gem installed!'
               yieldChefRuby {
-                puts "Chef is not essential right now ... ignoring"
+                puts 'Chef is not essential right now ... ignoring'
               }
             end
           else

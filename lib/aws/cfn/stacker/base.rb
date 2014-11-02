@@ -1,16 +1,20 @@
 require "aws/cfn/stacker/version"
 require 'aws/cfn/stacker/subcommand_loader'
 require 'aws/cfn/stacker/mixins/convert_to_class_name'
+require 'mixlib/cli'
 
 module Aws
   module Cfn
     module Stacker
       class StackerBase
 
+        include ::Mixlib::CLI
+
         extend Aws::Cfn::Stacker::ConvertToClassName
 
         # ClassMethods
         class << self
+          include ::Mixlib::CLI::ClassMethods
 
           # noinspection RubyClassVariableUsageInspection
           def self.reset_config_path!

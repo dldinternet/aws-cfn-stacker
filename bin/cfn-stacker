@@ -3,6 +3,7 @@
 require 'rubygems'
 
 path = File.dirname(__FILE__)
+cmd  = File.basename(__FILE__, '.rb')
 if File.exists?("#{path}/../.gitignore")
   %w(aws-cfn-decompiler aws-cfn-compiler aws-cfn-dsl cloudformation-ruby-dsl dldinternet-mixlib-logging dldinternet-mixlib-cli).each do |mod|
     add_path = File.expand_path(File.join(path, "../../#{mod}", "lib"))
@@ -10,7 +11,6 @@ if File.exists?("#{path}/../.gitignore")
   end
 else
   # Borrowing from "whiches" gem ...
-  cmd  = File.basename(__FILE__, '.rb')
   exes = []
   exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
   ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
@@ -24,7 +24,7 @@ else
   end
 
 end
-add_path = File.expand_path(File.join(path, "..", "lib"))
+add_path = File.expand_path(File.join(path, '..', 'lib'))
 $:.unshift(add_path)
 
 require 'aws/cfn/stacker'
