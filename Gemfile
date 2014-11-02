@@ -48,3 +48,5 @@ gem 'aws-cfn-dsl',                :path => '../aws-cfn-dsl', :group => :developm
 gem 'aws-cfn-decompiler',         :path => '../aws-cfn-decompiler', :group => :development
 gem 'aws-cfn-compiler',           :path => '../aws-cfn-compiler', :group => :development
 #gem 'aws-cfn-yats',               :path => '../aws-cfn-yats', :group => :development
+
+gem 'chef', '~> 11.16'
