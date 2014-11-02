@@ -47,3 +47,8 @@ build/
 .idea
 *.iml
 out
+ui/war/UI
+ui/war/WEB-INF/classes
+ui/gwt-unitCache
+ui/war/WEB-INF/deploy
+ui/war/WEB-INF/lib
