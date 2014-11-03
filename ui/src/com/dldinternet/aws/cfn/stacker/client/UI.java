@@ -8,6 +8,9 @@ import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.dom.client.*;
 import com.google.gwt.user.client.ui.*;
 import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.sencha.gxt.widget.core.client.box.MessageBox;
+import com.sencha.gxt.widget.core.client.button.TextButton;
+import com.sencha.gxt.widget.core.client.event.SelectEvent;
 
 /**
  * Entry point classes define <code>onModuleLoad()</code>
@@ -136,5 +139,16 @@ public class UI implements EntryPoint {
         MyHandler handler = new MyHandler();
         sendButton.addClickHandler(handler);
         nameField.addKeyUpHandler(handler);
+
+        TextButton textButton = new TextButton("Verify GXT Works");
+        RootPanel.get().add(textButton);
+        textButton.addSelectHandler(new SelectEvent.SelectHandler() {
+            @Override
+            public void onSelect(SelectEvent event) {
+                MessageBox messageBox = new MessageBox("GXT Works.");
+                messageBox.show();
+            }
+        });
+
     }
 }
