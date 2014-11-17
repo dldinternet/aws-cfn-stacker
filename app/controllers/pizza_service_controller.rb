@@ -1,0 +1,2 @@
+class PizzaServiceController < ApplicationController
+end

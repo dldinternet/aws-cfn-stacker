@@ -18,7 +18,74 @@
 
     <!-- Default page to serve -->
     <welcome-file-list>
-        <welcome-file>UI.html</welcome-file>
+        <welcome-file>/UI/UI.html</welcome-file>
     </welcome-file-list>
+
+    <!-- gwt-rpc-plus -->
+    <!--<servlet>-->
+        <!--<servlet-name>exampleService</servlet-name>-->
+        <!--<servlet-class>-->
+            <!--com.dotspots.rpcplus.example.jsonrpc.thrift.ExampleService-->
+        <!--</servlet-class>-->
+    <!--</servlet>-->
+    <!--<servlet-mapping>-->
+        <!--<servlet-name>exampleService</servlet-name>-->
+        <!--<url-pattern>/UI/api/torturetest-->
+        <!--</url-pattern>-->
+    <!--</servlet-mapping>-->
+
+    <!-- RestyGWT -->
+    <servlet>
+        <servlet-name>pizza-service</servlet-name>
+        <servlet-class>com.dldinternet.aws.cfn.stacker.server.PizzaServlet</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>jsonp-service</servlet-name>
+        <servlet-class>com.dldinternet.aws.cfn.stacker.server.JsonpServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping><servlet-name>jsonp-service</servlet-name><url-pattern>/UI/jsonp-service</url-pattern></servlet-mapping>
+
+    <servlet-mapping>
+        <servlet-name>pizza-service</servlet-name>
+        <url-pattern>/UI/pizza-service/toppings</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>pizza-service</servlet-name>
+        <url-pattern>/UI/pizza-service</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>pizza-service</servlet-name>
+        <url-pattern>/UI/pizza-service/ping</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>testServlet</servlet-name>
+        <servlet-class>com.dldinternet.aws.cfn.stacker.server.TestServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>testServlet</servlet-name>
+        <url-pattern>/UI/test/fail</url-pattern>
+    </servlet-mapping>
+    <servlet>
+        <servlet-name>jUnitHostImpl</servlet-name>
+        <servlet-class>com.google.gwt.junit.server.JUnitHostImpl</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>jUnitHostImpl</servlet-name>
+        <url-pattern>/UI/junithost/*</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>testServlet</servlet-name>
+        <url-pattern>/UI/test/JSONBinding/getListOfStrings</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>testServlet</servlet-name>
+        <url-pattern>/UI/test/JSONBinding/getStringMapResponse</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>testServlet</servlet-name>
+        <url-pattern>/UI/test/method</url-pattern>
+    </servlet-mapping>
 
 </web-app>

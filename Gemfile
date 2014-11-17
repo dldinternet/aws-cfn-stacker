@@ -23,10 +23,10 @@ gem 'turbolinks'
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem 'jbuilder', '~> 2.0'
 # bundle exec rake doc:rails generates the API under doc/api.
-gem 'sdoc', '~> 0.4.0',          group: :doc
+gem 'sdoc', '~> 0.4.0', :group => :doc
 
 # Spring speeds up development by keeping your application running in the background. Read more: https://github.com/rails/spring
-gem 'spring',        group: :development
+gem 'spring', :group => :development
 
 # Use ActiveModel has_secure_password
 # gem 'bcrypt', '~> 3.1.7'
@@ -43,10 +43,15 @@ gem 'spring',        group: :development
 gem 'cloudformation-ruby-dsl',    :path => '../cloudformation-ruby-dsl', :group => :development
 
 gem 'dldinternet-mixlib-logging', :path => '../dldinternet-mixlib-logging', :group => :development
-gem 'dldinternet-mixlib-cli',     :path => '../dldinternet-mixlib-cli', :group => :development
-gem 'aws-cfn-dsl',                :path => '../aws-cfn-dsl', :group => :development
-gem 'aws-cfn-decompiler',         :path => '../aws-cfn-decompiler', :group => :development
-gem 'aws-cfn-compiler',           :path => '../aws-cfn-compiler', :group => :development
-#gem 'aws-cfn-yats',               :path => '../aws-cfn-yats', :group => :development
+# gem 'dldinternet-mixlib-cli',     :path => '../dldinternet-mixlib-cli', :group => :development
+# gem 'aws-cfn-dsl',                :path => '../aws-cfn-dsl', :group => :development
+# gem 'aws-cfn-decompiler',         :path => '../aws-cfn-decompiler', :group => :development
+# gem 'aws-cfn-compiler',           :path => '../aws-cfn-compiler', :group => :development
 
 gem 'chef', '~> 11.16'
+
+group :development, :test do
+  gem 'rspec'
+  gem 'rspec-core'
+  gem 'rspec-rails', '~> 3'
+end

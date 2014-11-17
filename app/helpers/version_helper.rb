@@ -26,7 +26,7 @@ class VersionInfo
         @m_user
     end
 
-    def getRevision()
+    def getRelease()
         @m_release
     end
 
@@ -47,6 +47,10 @@ Version: #{@m_version}
 Release: #{@m_release}
 Date: #{@m_date}
       EOS
+    end
+
+    def to_h
+      Hash[ :Version, @m_version, :Release, @m_release, :Date, @m_date ]
     end
 
     private

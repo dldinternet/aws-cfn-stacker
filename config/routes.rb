@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
-  get 'version/index'
-  get 'version' => 'version#index'
+  # get 'version/index'
+  get 'version', to: 'version#index'
+  get 'version*format', to: 'version#index'
 
   # The priority is based upon order of creation: first created -> highest priority.
   # See how all your routes lay out with "rake routes".

@@ -1,6 +1,6 @@
 package com.dldinternet.aws.cfn.stacker.server;
 
-import com.dldinternet.aws.cfn.stacker.client.GreetingService;
+import com.dldinternet.aws.cfn.stacker.api.service.GreetingService;
 import com.dldinternet.aws.cfn.stacker.shared.FieldVerifier;
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
 
