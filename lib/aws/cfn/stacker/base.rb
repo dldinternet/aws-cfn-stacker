@@ -1,4 +1,4 @@
-require "aws/cfn/stacker/version"
+require 'aws/cfn/stacker/version'
 require 'aws/cfn/stacker/subcommand_loader'
 require 'aws/cfn/stacker/mixins/convert_to_class_name'
 require 'mixlib/cli'
@@ -6,15 +6,41 @@ require 'mixlib/cli'
 module Aws
   module Cfn
     module Stacker
+      LOGLEVELS  = [ :trace, :debug, :info, :step, :warn, :error, :fatal, :todo ]
+
       class StackerBase
 
         include ::Mixlib::CLI
 
         extend Aws::Cfn::Stacker::ConvertToClassName
 
+        # --------------------------------------------------------------------------------------------------------------
+        attr_accessor :argv
+        attr_accessor :logger
+        attr_accessor :LOGLEVELS
+        attr_accessor :subcommand_class_name
+        attr_accessor :subcommand_class_args
+
+        def argv
+          @argv || ARGV
+        end
+
+        def argv=(args)
+          @argv = args
+        end
+
         # ClassMethods
+        # noinspection RubyInstanceVariableNamingConvention
         class << self
           include ::Mixlib::CLI::ClassMethods
+
+          def loglevels
+            @LOGLEVELS
+          end
+
+          def loglevels=(levels)
+            @LOGLEVELS  = levels || LOGLEVELS
+          end
 
           # noinspection RubyClassVariableUsageInspection
           def self.reset_config_path!
@@ -88,6 +114,7 @@ module Aws
             @commands_loaded ||= subcommand_loader.load_commands
           end
 
+          # noinspection RubyClassVariableUsageInspection
           def subcommands
             @@subcommands ||= {}
           end
@@ -102,7 +129,7 @@ module Aws
             @subcommands_by_category
           end
 
-          # Print the list of subcommands knife knows about. If +preferred_category+
+          # Print the list of subcommands we know about. If +preferred_category+
           # is given, only subcommands in that category are shown
           def list_commands(preferred_category=nil)
             load_commands
@@ -140,15 +167,20 @@ module Aws
             end
           end
 
-          def subcommand_class_from(args)
+          def subcommand_class_from(args, object=nil)
             command_words = args.select {|arg| arg =~ /^(([[:alnum:]])[[:alnum:]\_\-]+)$/ }
 
             subcommand_class = nil
 
             while ( !subcommand_class ) && ( !command_words.empty? )
-              snake_case_class_name = command_words.join("_")
+              snake_case_class_name = command_words.join("_").gsub('-', '_')
               subcommand_class = subcommands[snake_case_class_name]
-              unless subcommand_class
+              if subcommand_class
+                if object
+                  object.subcommand_class_name = snake_case_class_name
+                  object.subcommand_class_args = command_words
+                end
+              else
                 command_words.pop
               end
             end
@@ -163,7 +195,8 @@ module Aws
           def subcommand_not_found!(args)
             puts "Cannot find sub command for: '#{args.join(' ')}'"
 
-            if category_commands = guess_category(args)
+            category_commands = guess_category(args)
+            if category_commands
               list_commands(category_commands)
             else
               list_commands
@@ -184,21 +217,140 @@ module Aws
             matching_category
           end
 
-          attr_accessor :stacker_cmd
+          attr :stacker_cmd
           def cmd=(cmd)
             @stacker_cmd = cmd
           end
 
+          def cmd
+            @stacker_cmd
+          end
+
         end # ClassMethods
+
+        %w(Logging).each { |m|
+          require "aws/cfn/stacker/mixins/#{m.downcase}"
+          eval "include Aws::Cfn::Stacker::#{m}"
+        }
+
+        # -----------------------------------------------------------------------------
+        def logError(msg,cat='Error')
+          logger = getLogger(@logger_args, 'logError')
+          if logger
+            if logger.get_trace
+              ::Logging::LogEvent.caller_index += 1
+            end
+            logger.error "#{cat} #{msg} ..."
+            if logger.get_trace
+              ::Logging::LogEvent.caller_index -= 1
+            end
+          else
+            puts "#{cat} #{msg} ..."
+          end
+        end
+
+        # Reconfigure the application. You'll want to override and super this method.
+        def reconfigure
+          configure_application
+          configure_alt_options
+          configure_logging
+        end
+
+        # Parse configuration (options and config file)
+        def configure_application
+          parse_options(argv)
+          load_config_file
+        end
+
+        # --------------------------------------------------------------------------------
+        def configure_alt_options()
+          @config.each do |opt,val|
+            if opt.to_s.match(%r'_alt$')
+              reg = opt.to_s.gsub(%r'_alt$', '').to_sym
+              unless @config[reg] and (@options[reg][:default] != @config[reg])
+                @config[reg] = val
+              end
+            end
+          end
+        end
+
+        # --------------------------------------------------------------------------------
+        def load_config_defaults(path=nil)
+          logError "#{self.class.to_s}: you must override #{__method__}"
+          {}
+        end
+
+        # Parse the config file
+        def load_config_file(path=nil)
+          <<-EOC
+          Loads config files from a given path, or additional paths if not specified.
+
+          If a specific path isn't specified, loads the following locations:
+            - $CWD/config/config.ini
+            - $HOME/.stacker/config.ini
+            - /etc/stacker/config.ini
+            - /usr/local/etc/stacker/config.ini
+
+          EOC
+          defaults = load_config_defaults(path)
+
+          paths = [
+              File.join(Dir.getwd(),'config', 'config.yaml'),
+              File.join(File.expand_path("~"), 'config.yaml'),
+              '/etc/stacker/config.yaml',
+              '/usr/local/etc/stacker/config.yaml',
+
+              File.join(Dir.getwd(),'config', 'config.ini'),
+              File.join(File.expand_path("~"), 'config.ini'),
+              '/etc/stacker/config.ini',
+              '/usr/local/etc/stacker/config.ini',
+
+          ]
+
+          if path
+            paths.unshift path
+          end
+          config = nil
+          paths.each do |path|
+            begin
+              config = if path.match(%r'\.ini$')
+                         require 'inifile'
+                         IniFile.load(path)
+                       else
+                         require 'yaml'
+                         YAML.load(IO.read(path),path)
+                       end
+              @inis << path
+              break
+            rescue => e
+              # noop
+            end
+          end
+          config
+        end
+
+        def configure_logging
+          @config[:log_opts] = lambda{  |mlll|
+                                        {
+                                          :pattern      => "%#{mlll}l: %m %C\n",
+                                          :date_pattern => '%Y-%m-%d %H:%M:%S',
+                                        }
+                                      }
+          @config[:log_levels] ||= LOGLEVELS
+          @logger = getLogger(@config)
+        end
+
+        def configure_stdout_logger
+        end
 
         # Called prior to starting the application, by the run method
         def setup_application
-          logger.warn "#{self.to_s}: you must override setup_application"
+          logError "#{self.class.to_s}: you must override #{__method__}"
         end
 
         # Actually run the application
         def run_application
-          logger.warn "#{self.to_s}: you must override run_application"
+          logError "#{self.class.to_s}: you must override #{__method__}"
         end
 
       end

@@ -11,90 +11,6 @@ module Aws
         include ::DLDInternet::Mixlib::CLI::Parsers
 
         # --------------------------------------------------------------------------------
-        #
-        # Override Mixlib::CLI.parse_options and
-        # knowingly add extra paramater to track argument source
-        #
-        # We do this by monkey patching this override method at include time instead of statically declaring it
-        # in which case the Mixlib::CLI.parse_options seems to "win" most of the time OR the interpreter complains.
-        #
-        def parse_options(args,source=nil)
-          # noinspection RubySuperCallWithoutSuperclassInspection
-          argv = super(args)
-
-          prescreen_options(argv)
-
-          @config = parse_and_validate_options(@config,source ? source : "ARGV - #{File.basename __FILE__}::#{__LINE__}")
-
-          if argv.size > 0
-            argv.each { |arg|
-              action = parseOptionString(arg, ',', 'parseActionSymbol')
-              if action
-                @config[:actions] << action
-              end
-            }
-          end
-          actions = Hash[@config[:actions].flatten.map{ |v| [v, 1] }]
-          @config[:actions] = actions.keys
-          @config[:actions].each {|action|
-            unless StackerApplication.actors[action]
-              subcommand_class = StackerApplication.subcommand_class_from([action.to_s])
-              subcommand_class.load_deps
-              instance = subcommand_class.new()
-              StackerApplication.actors[action] = instance
-              instance.configure_application
-            end
-          }
-          argv
-
-        end
-
-        # --------------------------------------------------------------------------------------------------------------
-        #
-        # Do a quick prescreening of the arguments and bail early for some obvious cases
-        #
-        def prescreen_options(argv=ARGV)
-          # Checking ARGV validity *before* parse_options because parse_options
-          # mangles ARGV in some situations
-          if no_command_given?
-            print_help_and_exit(1, @NO_COMMAND_GIVEN)
-          elsif no_subcommand_given?
-            if want_help? || want_version?
-              print_help_and_exit
-            else
-              print_help_and_exit(2, @NO_COMMAND_GIVEN)
-            end
-          end
-        end
-
-        # --------------------------------------------------------------------------------------------------------------
-        # private
-        # --------------------------------------------------------------------------------------------------------------
-        def no_subcommand_given?(argv=ARGV)
-          argv[0] =~ /^--?[^a]/
-        end
-
-        def no_command_given?(argv=ARGV)
-          argv.empty?
-        end
-
-        def want_help?
-          ARGV[0] =~ /^(--help|-h)$/
-        end
-
-        def want_version?
-          ARGV[0] =~ /^(--version|-v)$/
-        end
-
-        def print_help_and_exit(exitcode=1, fatal_message=nil)
-          puts "FATAL: #{fatal_message}" if fatal_message
-
-          puts self.opt_parser
-          puts
-          exit exitcode
-        end
-
-        # --------------------------------------------------------------------------------
         def parseActionSymbol(v)
           if v.to_sym == :all
             StackerApplication.allactions
@@ -186,9 +102,11 @@ module Aws
           logStep ('Check ENVironment')
           env = ENV.to_hash
           missing = {}
-          %w(AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY).each { |k|
-            missing[k] = true unless ENV.has_key?(k)
-          }
+          if options[:use_aws]
+            %w(AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY).each { |k|
+              missing[k] = true unless ENV.has_key?(k)
+            }
+          end
           if options[:use_chef]
             %w(KNIFE_CHEF_SERVER_URL KNIFE_CLIENT_KEY KNIFE_CLIENT_NAME).each { |k|
               missing[k] = true unless ENV.has_key?(k)
@@ -295,95 +213,195 @@ module Aws
 
             <<-EOF
 
-            -c CONFIG_FILE, --config-file CONFIG_FILE
-                                  An ini file to use that contains one section per stack, with all the parameters for the stack enumerated
-            -v, --verbose         Increase verbosity, can be specified multiple times (currently just sets the debug level for AWS)
-            --debug               Increase debug, can be specified multiple times
-            -r, --remove          Delete the requested stack. WARNING: No second chances!
-            -d, --delete          Delete the requested stack. WARNING: No second chances!
-            -l, --list-params     List the parameters in the template, and show what values are supplied by your config file
-            -t TEMPLATE, --template TEMPLATE
-                                  Specify a different template to run. Note that specific outputs are expected, so results may vary.
-            --template_url TEMPLATE_URL
-                                  Specify the key of a template stored in an S3 bucket to run. This method assumes the template has already been uploaded.
-            --use_s3              Use an S3 bucket to upload the template to before attempting stack run. This method assumes the template needs to be uploaded and may overwrite a key with the same name.
-            -k KEYFILE, --keyfile KEYFILE
-                                  The path to the SSH key file to use for SSH to hosts
-            -b, --build           Build configuration directory for use with Ansible.
-            -i INITIAL_SETUP, --initial_setup INITIAL_SETUP
-                                  An initial setup file for Ansible
-            -o OUTPUT, --output OUTPUT
-                                  Output folder for the Ansible build configuration
-            -R ROLES_PATH, --roles_path ROLES_PATH
-                                  Folder for the Ansible roles
-            --ssh_user SSH_USER   SSH User name
-            --ssh_user_bastion SSH_USER_BASTION
-                                  Bastion SSH User name
-            -u, --update          Update the configuration of an existing stack
-            -C, --configure       Run pre-defined ansible playbooks against the given stack. Implies -b
-            -s, --status          Print the current status of a given stack.
-            -p, --progress        Print a progress indicator during stack create/update/delete.
+            usage: build.py [-h] [-c CONFIG_FILE] [--ec2-config EC2_CONFIG]
+                            [--profile PROFILE] [-v] [--debug] [--trace]
+                            [--log_level LOG_LEVEL] [--log_file LOG_FILE]
+                            [--log_format LOG_FORMAT] [-d] [-r] [-y] [-n] [-w] [-g]
+                            [--timestamp] [-l] [--list-stacks] [-t TEMPLATE]
+                            [--template_url TEMPLATE_URL] [--use_s3] [--cloudfront]
+                            [-k KEYFILE] [-b] [-a ./ansible]
+                            [-i ansible/playbooks/initial_setup.yml] [-o OUTPUT]
+                            [-R ansible/playbooks/roles]
+                            [-V ansible/playbooks/roles/group_vars/all]
+                            [--ssh_user SSH_USER] [--ssh_user_bastion SSH_USER_BASTION]
+                            [-u] [-C] [-U] [--quick] [-s] [-p] [--compile]
+                            [--specification SPECIFICATION] [--stack_path STACK_PATH]
+                            [--brick_path BRICK_PATH] [--rvm_ruby RVM_RUBY]
+                            [--rvm_gemset RVM_GEMSET]
+                            STACK_NAME
+
+            Build a Core Platform VPC
+
+            positional arguments:
+              STACK_NAME            A stack to operate on.
+
+            optional arguments:
+              -h, --help            show this help message and exit
+              -c CONFIG_FILE, --config-file CONFIG_FILE
+                                    An ini file to use that contains one section per
+                                    stack, with all the parameters for the stack
+                                    enumerated
+              --ec2-config EC2_CONFIG
+                                    An EC2 environment config file containing the
+                                    credentials for accessing the AWS API
+              --profile PROFILE     AWS credentials using the default config from environmetns .aws/config file to access AWS API
+              -v, --verbose         Increase verbosity, can be specified multiple times
+                                    (currently just sets the debug level for AWS)
+              --debug               Increase debug, can be specified multiple times
+              --trace               Increase tracing, can be specified multiple times
+              --log_level LOG_LEVEL
+                                    The logging level desired. One of warn,info,step,criti
+                                    cal,trace,err,error,crit,debug,warning
+              --log_file LOG_FILE   The log file to write log messages to
+              --log_format LOG_FORMAT
+                                    The logging format to write log messages in (See
+                                    https://docs.python.org/2/howto/logging.html#changing-
+                                    the-format-of-displayed-messages)
+              -d, --delete          Delete the requested stack. WARNING: No second
+                                    chances!
+              -r, --remove          Delete the requested stack. WARNING: No second
+                                    chances!
+              -y, --yes             Answer yes to all confirmation promtps
+              -n, --no              Answer no to all confirmation promtps
+              -w, --watch           Watch the progress of the requested stack. Useful if a
+                                    create/update/delete was interrupted.
+              -g, --background      Run stack operation in the background. Useful if a
+                                    create/update/delete will take a long time and you
+                                    don't want to hold the terminal hostage.
+              --timestamp           Put timestamp on progress log output.
+              -l, --list-params     List the parameters in the template, and show what
+                                    values are supplied by your config file
+              --list-stacks         List the stacks in the configuration file
+              -t TEMPLATE, --template TEMPLATE
+                                    Specify a different template to run. Note that
+                                    specific outputs are expected, so results may vary.
+              --template_url TEMPLATE_URL
+                                    Specify the key of a template stored in an S3 bucket
+                                    to run. This method assumes the template has already
+                                    been uploaded.
+              --use_s3              Use an S3 bucket to upload the template to before
+                                    attempting stack run. This method assumes the template
+                                    needs to be uploaded and may overwrite a key with the
+                                    same name.
+              --cloudfront          Use this to include cloudfront resources in the stack.
+              -k KEYFILE, --keyfile KEYFILE
+                                    The path to the SSH key file to use for SSH to hosts
+              -b, --build           Build configuration directory for use with Ansible.
+              -a ./ansible, --ansible ./ansible
+                                    Path to the 'ansible' directory ex. /Development
+                                    /ansible-playbooks/ansible
+              -i ansible/playbooks/initial_setup.yml, --initial_setup ansible/playbooks/initial_setup.yml
+                                    An initial setup file for Ansible
+              -o OUTPUT, --output OUTPUT
+                                    Output folder for the Ansible build configuration
+              -R ansible/playbooks/roles, --roles_path ansible/playbooks/roles
+                                    Folder for the Ansible roles
+              -V ansible/playbooks/roles/group_vars/all, --vars_file ansible/playbooks/roles/group_vars/all
+                                    File with the Ansible vars common to all playbooks
+              --ssh_user SSH_USER   SSH User name
+              --ssh_user_bastion SSH_USER_BASTION
+                                    Bastion SSH User name
+              -u, --update          Update the configuration of an existing stack
+              -C, --configure       Run pre-defined ansible playbooks against the given
+                                    stack. Implies -b and -U
+              -U, --upload          Upload Ansible stack configuration directory items if
+                                    meta-coordinates specified in INI. Implies -b.
+              --quick               Show the quick (no instance detail) status of a given
+                                    stack.
+              -s, --status          Print the current status of a given stack.
+              -p, --progress        Print a progress indicator during stack
+                                    create/update/delete.
+              --compile             Compile template.
+              --specification SPECIFICATION
+                                    Template specification.
+              --stack_path STACK_PATH
+                                    Stack path.
+              --brick_path BRICK_PATH
+                                    Brick path.
+              --rvm_ruby RVM_RUBY   RVM Gem set.
+              --rvm_gemset RVM_GEMSET
+                                    RVM Gem set.
 
             EOF
 
             option  :help,
                     short:        '-h',
                     long:         '--help',
-                    description:  'Show this message',
+                    description:  'Show this help message and exit',
                     show_options: true,
                     exit:         1
             # print the version.
             option  :version,
-                    short:        '-V',
                     long:         '--version',
                     description:  'Show version',
                     proc:         Proc.new{ puts ::Aws::Cfn::Stacker::VERSION },
                     exit:         2
             option  :config_file_alt,
-                    short:        '-c',
-                    long:         '--config-file FILE',
-                    description:  'A config file to use that contains one section per stack, with all the parameters for the stack enumerated. INI, YAML and JSON formats supported.',
+                    long:         '--config_file FILE',
+                    description:  'A config file to use that contains one section per stack, with all the parameters for the stack enumerated.',
                     proc:         lambda{ |v|
                       @options[:config_file] = v
                     }
             option  :config_file,
                     short:        '-c',
-                    long:         '--config_file FILE',
-                    description:  'A config file to use that contains one section per stack, with all the parameters for the stack enumerated. INI, YAML and JSON formats supported.',
+                    long:         '--config-file FILE',
+                    description:  'A config file which contains one section per stack.',
                     default:      'config/config.ini'
+            option  :debug,
+                    short:        '-D',
+                    long:         '--debug',
+                    description:  'Increase debug level, can be specified multiple times.'
+            option  :yes,
+                    short:        '-y',
+                    long:         '--yes',
+                    description:  'Answer yes to all confirmation promtps'
+            option  :no,
+                    short:        '-n',
+                    long:         '--no',
+                    description:  'Answer no to all confirmation promtps'
             option  :verbose,
                     short:        '-v',
                     long:         '--verbose',
-                    description:  'Increase verbosity, can be specified multiple times',
+                    description:  'Increase verbosity, can be specified multiple times.',
                     proc:         lambda {|v|
                       index = $STKR.class.loglevels.index(@options[:log_level]) || $STKR.class.loglevels.index(:warn)
                       index -= 1 if index > 0
                       @options[:log_level] = $STKR.class..loglevels[index]
                     }
-            option  :log_level,
+            option  :debug,
                     long:         '--debug',
-                    description:  'Set debug level logging. No effect if specified second time.',
-                    default:      :debug
-            option  :actions,
+                    description:  'Increase debug level, can be specified multiple times.'
+            option  :trace,
+                    long:         '--trace',
+                    description:  'Increase tracing, can be specified multiple times'
+            option  :ansible,
                     short:        '-a',
-                    long:         '--action ACTION',
-                    description:  "Perform the requested action against the stack. (#{StackerApplication.allactions.to_s})",
-                    proc:         lambda{|v|
-                      actions = $STKR.parseOptionString(v,',', 'parseActionSymbol')
-                      all     = [StackerApplication.allactions, :all].flatten
-                      actions.each{ |act|
-                        unless all.include?(act.to_sym)
-                          raise ::OptionParser::InvalidOption.new("Invalid action: #{act.to_s}. Valid actions are: #{all.to_s}")
-                        end
-                      }
-                      actions
-                    },
-                    default:      [ :create ]
+                    long:         '--ansible',
+                    description:  "Path to the 'ansible' directory ex. /Development /ansible-playbooks/ansible"
+            # option  :actions,
+            #         short:        '-A',
+            #         long:         '--action ACTION',
+            #         description:  "Perform the requested action against the stack. (#{StackerApplication.allactions.to_s})",
+            #         proc:         lambda{|v|
+            #           actions = $STKR.parseOptionString(v,',', 'parseActionSymbol')
+            #           all     = [StackerApplication.allactions, :all].flatten
+            #           actions.each{ |act|
+            #             unless all.include?(act.to_sym)
+            #               raise ::OptionParser::InvalidOption.new("Invalid action: #{act.to_s}. Valid actions are: #{all.to_s}")
+            #             end
+            #           }
+            #           actions
+            #         },
+            #         default:      [ :create ]
             option  :build,
                     short:        '-b',
                     long:         '--build',
                     description:  'Build configuration directory for use with Ansible.',
                     proc:         lambda { |v| @options[:action] = :build}
+            option  :compile,
+                    long:         '--compile',
+                    description:  'Compile template.',
+                    proc:         lambda { |v| @options[:action] = :compile}
             option  :remove,
                     short:        '-r',
                     long:         '--remove',
@@ -404,28 +422,55 @@ module Aws
                     long:         '--list-params',
                     description:  'List the parameters in the template, and show what values are supplied by your config file',
                     proc:         lambda { |v| @options[:action] = :listparams}
+            option  :liststacks,
+                    long:         '--list-stacks',
+                    description:  'List the stacks in the configuration file',
+                    proc:         lambda { |v| @options[:action] = :liststacks}
             option  :configure,
                     short:        '-C',
                     long:         '--configure',
-                    description:  'Run pre-defined ansible playbooks against the given stack. Implies -b',
+                    description:  'Run pre-defined ansible playbooks against the given stack. Implies -b and -U',
                     proc:         lambda { |v| @options[:action] = :configure}
             option  :status,
                     short:        '-s',
                     long:         '--status',
-                    description:  'Run pre-defined ansible playbooks against the given stack. Implies -b',
+                    description:  'Print the current status of a given stack.',
                     proc:         lambda { |v| @options[:action] = :status}
+            option  :upload,
+                    short:        '-U',
+                    long:         '--upload',
+                    description:  'Upload Ansible stack configuration directory items if meta-coordinates specified in INI. Implies -b.',
+                    proc:         lambda { |v| @options[:action] = :upload}
+            option  :watch,
+                    short:        '-w',
+                    long:         '--watch',
+                    description:  'Watch the progress of the requested stack. Useful if a create/update/delete was interrupted.',
+                    proc:         lambda { |v| @options[:action] = :watch}
+            option  :timestamp,
+                    long:         '--timestamp',
+                    description:  'Put timestamp on progress log output.'
+            option  :quick,
+                    long:         '--quick',
+                    description:  'Show the quick (no instance detail) status of a given stack.'
+            option  :background,
+                    short:        '-g',
+                    long:         '--background',
+                    description:  "Run stack operation in the background. Useful if a create/update/delete will take a long time and you don't want to hold the terminal hostage."
+            option  :cloudfront,
+                    long:         '--cloudfront',
+                    description:  'Use this to include cloudfront resources in the stack. (Deprecated/ Ignored)'
             option  :template,
                     short:        '-t',
                     long:         '--template FILE',
-                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary. Default #{StackerApplication.defaultoptions[:template_file]}",
+                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary.",
                     proc:         lambda { |v| @options[:template_file] = v }
             option  :template_file,
                     long:         '--template-file FILE',
-                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary. Default #{StackerApplication.defaultoptions[:template_file]}",
+                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary.",
                     default:      'templates/mvc-vpc.json'
             option  :template_file_alt,
                     long:         '--template_file FILE',
-                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary. Default #{StackerApplication.defaultoptions[:template_file]}",
+                    description:  "Specify a template to run. Note that specific outputs are expected, so results may vary.",
                     proc:         lambda { |v| @options[:template_file] = v }
             option  :template_url_alt,
                     long:         '--template-url URL',
@@ -458,30 +503,58 @@ module Aws
                     short:        '-o',
                     long:         '--output PATH',
                     description:  'Output folder for the Ansible build configuration'
+            option  :specification,
+                    long:         '--specification PATH',
+                    description:  'Template specification.'
+            option  :brick_path,
+                    long:         '--brick_path PATH',
+                    description:  'Brick path.'
+            option  :stack_path,
+                    long:         '--stack_path PATH',
+                    description:  'Stack path.'
+            option  :rvm_ruby,
+                    long:         '--rvm_ruby PATH',
+                    description:  'RVM Gem set.'
             option  :roles_path,
-                    short:        '-r',
+                    short:        '-R',
                     long:         '--roles_path PATH',
-                    description:  'Output folder for the Ansible build configuration',
+                    description:  'Folder for the Ansible roles',
                     default:      'ansible/playbooks/roles'
+            option  :vars_file,
+                    short:        '-V',
+                    long:         '--vars_file PATH',
+                    description:  'File with the Ansible vars common to all playbooks'
             option  :progress,
                     short:        '-p',
                     long:         '--progress',
                     description:  'Print a progress indicator during stack create/update/delete.',
                     default:      false
+            option  :ec2_config_alt,
+                    long:         '--ec2-config FILE',
+                    description:  'An EC2 environment config file containing the credentials for accessing the AWS API'
+            option  :ec2_config,
+                    long:         '--ec2_config FILE',
+                    description:  'An EC2 environment config file containing the credentials for accessing the AWS API'
             option  :inifile,
-                    short:        "-f",
-                    long:         "--inifile FILE",
-                    description:  "INI file with settings"
+                    short:        '-f',
+                    long:         '--inifile FILE',
+                    description:  'INI file with settings'
+            option  :profile,
+                    long:         '--profile PROFILE',
+                    description:  "AWS credentials using the default config from environments' .aws/config file to access AWS API."
             option  :log_file_alt,
                     long:         '--log-file PATH',
                     description:  'Log destination file',
                     proc:         lambda { |v| @options[:log_file] = v }
             option  :log_file,
                     long:         '--log_file PATH',
-                    description:  'Log destination file'
+                    description:  'The log file to write log messages to'
+            option  :log_format,
+                    long:         '--log_format FORMAT',
+                    description:  'The logging format to write log messages in (Not used)'
             option  :log_level_alt,
                     long:         '--log-level LEVEL',
-                    description:  'Logging level',
+                    description:  'Logging level. One of '+LOGLEVELS.join(', '),
                     proc:         lambda{|v|
                       if StackerApplication.loglevels.include? v.to_sym
                         v.to_sym
@@ -495,7 +568,7 @@ module Aws
                     }
             option  :log_level,
                     long:         '--log_level LEVEL',
-                    description:  'Logging level',
+                    description:  'Logging level. One of '+LOGLEVELS.join(', '),
                     proc:         lambda{|v|
                       if StackerApplication.loglevels.include? v.to_sym
                         v.to_sym
@@ -506,7 +579,8 @@ module Aws
                         end
                         level[0].to_sym
                       end
-                    }
+                    },
+                    default: :step
             option  :report_config_alt,
                     long:         '--report-config',
                     description:  'Report Configuration',
@@ -514,6 +588,13 @@ module Aws
             option  :report_config,
                     long:         '--report-config',
                     description:  'Report Configuration'
+
+            option  :build_py,
+                    long:         '--build-py BUILD_PY',
+                    description:  'Evaluate option compatibility with build.py'
+            option  :build_venv,
+                    long:         '--build-venv VENV_PATH',
+                    description:  'Virtual environment path for build.py'
 
           end # included
           # ------------------------------------------------------------------------------------------------------------

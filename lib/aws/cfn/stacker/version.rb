@@ -4,7 +4,7 @@ module Aws
 
         MAJOR   = 0
         MINOR   = 0
-        PATCH   = 6
+        PATCH   = 7
         VERSION = "#{MAJOR}.#{MINOR}.#{PATCH}"
         RELEASE = 1
 

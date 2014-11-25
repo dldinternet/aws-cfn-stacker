@@ -1,8 +1,8 @@
 module Aws::Cfn::Stacker
-  class ListParams < StackerBase
+  class ListStacks < StackerBase
     include Options
 
-    banner "#{Aws::Cfn::Stacker::StackerApplication.cmd} list params (options)"
+    banner "#{Aws::Cfn::Stacker::StackerApplication.cmd} list stacks (options)"
 
     def load_config_defaults(path=nil)
       {}
@@ -11,6 +11,7 @@ module Aws::Cfn::Stacker
     # Called prior to starting the application, by the run method
     def setup_application
       logStep "#{self.class.to_s}.#{__method__}"
+      logger.debug "#{argv.join(' ')}"
     end
 
     # Actually run the application
